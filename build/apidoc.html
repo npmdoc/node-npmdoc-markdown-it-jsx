@@ -1,0 +1,181 @@
+<div class="apidocDiv">
+<style>
+/*csslint
+*/
+.apidocDiv {
+    background: #fff;
+    font-family: Arial, Helvetica, sans-serif;
+}
+.apidocDiv a[href] {
+    color: #33f;
+    font-weight: bold;
+    text-decoration: none;
+}
+.apidocDiv a[href]:hover {
+    text-decoration: underline;
+}
+.apidocCodeCommentSpan {
+    background: #bbf;
+    color: #000;
+    display: block;
+}
+.apidocCodeKeywordSpan {
+    color: #d00;
+    font-weight: bold;
+}
+.apidocCodePre {
+    background: #eef;
+    border: 1px solid;
+    color: #777;
+    padding: 5px;
+    white-space: pre-wrap;
+}
+.apidocFooterDiv {
+    margin-top: 20px;
+    text-align: center;
+}
+.apidocModuleLi {
+    margin-top: 10px;
+}
+.apidocSectionDiv {
+    border-top: 1px solid;
+    margin-top: 20px;
+}
+.apidocSignatureSpan {
+    color: #777;
+    font-weight: bold;
+}
+</style>
+<h1>api documentation for
+    <a
+
+        href="https://github.com/osnr/markdown-it-jsx#readme"
+
+    >markdown-it-jsx (v1.1.0)</a>
+</h1>
+<h4>markdown-it plugin for embedding JSX syntax instead of raw HTML.</h4>
+<div class="apidocSectionDiv"><a
+    href="#apidoc.tableOfContents"
+    id="apidoc.tableOfContents"
+><h1>table of contents</h1></a><ol>
+
+    <li class="apidocModuleLi"><a href="#apidoc.module.markdown-it-jsx">module markdown-it-jsx</a><ol>
+
+        <li>
+
+            <a class="apidocElementLiA" href="#apidoc.element.markdown-it-jsx.markdown-it-jsx">
+            function <span class="apidocSignatureSpan"></span>markdown-it-jsx
+            <span class="apidocSignatureSpan">(md)</span>
+            </a>
+
+        </li>
+
+    </ol></li>
+
+</ol></div>
+
+<div class="apidocSectionDiv">
+<h1><a href="#apidoc.module.markdown-it-jsx" id="apidoc.module.markdown-it-jsx">module markdown-it-jsx</a></h1>
+
+
+    <h2>
+        <a href="#apidoc.element.markdown-it-jsx.markdown-it-jsx" id="apidoc.element.markdown-it-jsx.markdown-it-jsx">
+        function <span class="apidocSignatureSpan"></span>markdown-it-jsx
+        <span class="apidocSignatureSpan">(md)</span>
+        </a>
+    </h2>
+    <ul>
+    <li>description and source-code<pre class="apidocCodePre">function jsx_plugin(md) {
+  md.set({ xhtmlOut: true });
+
+  // JSX should entirely replace embedded HTML.
+  md.inline.ruler.before(&#x27;html_inline&#x27;, &#x27;jsx_inline&#x27;, jsx_inline);
+  md.disable(&#x27;html_inline&#x27;);
+  // We&#x27;ll parse blocks as inline and then strip the surrounding paragraph at the end; it&#x27;s easier.
+  md.disable(&#x27;html_block&#x27;);
+
+  md.core.ruler.push(&#x27;jsx_blockify&#x27;, function(state) {
+    // Look for things like &#x3c;p&#x3e;&#x3c;Component&#x3e; ... &#x3c;/Component&#x3e;&#x3c;/p&#x3e; and strip the &#x3c;p&#x3e;, &#x3c;/p&#x3e; there.
+    // FIXME Quadratic time in worst case, I think?
+    var paragraphTokensToRemove = [];
+
+    var lastInlineTokenSeen;
+    for (var blkIdx = 0; blkIdx &#x3c; state.tokens.length; blkIdx++) {
+      if (state.tokens[blkIdx].type !== &#x27;paragraph_open&#x27;) {
+        continue;
+      }
+
+      var nextBlkToken = state.tokens[blkIdx + 1];
+      if (nextBlkToken.type !== &#x27;inline&#x27; || nextBlkToken.children[0].type !== &#x27;jsx_inline&#x27;) {
+        continue;
+      }
+
+      // FIXME Incorrect and a hack:
+      // &#x3c;p&#x3e;&#x3c;Component&#x3e; ... &#x3c;/OtherComponent&#x3e;&#x3c;/p&#x3e; will also get stripped.
+      var paragraphOpens = 0;
+      for (var i = blkIdx + 1; i &#x3c; state.tokens.length; i++) {
+        if (state.tokens[i].type === &#x27;paragraph_open&#x27;) {
+          paragraphOpens++;
+          continue;
+
+        } else if (state.tokens[i].type !== &#x27;paragraph_close&#x27;) {
+          continue;
+        }
+
+        if (paragraphOpens &#x3e; 0) {
+          paragraphOpens--;
+          continue;
+        }
+
+        // OK, this is the paragraph_close matching the open we started on.
+        // What came right before here?
+        var prevBlkToken = state.tokens[i - 1];
+        if (prevBlkToken.type !== &#x27;inline&#x27;) {
+          break;
+        }
+        var prevInlineToken = prevBlkToken.children[prevBlkToken.children.length - 1];
+        if (prevInlineToken.type !== &#x27;jsx_inline&#x27;) {
+          break;
+        }
+
+        // If we got this far, we&#x27;re stripping the surrounding paragraph.
+
+        // FIXME Also a hack. The &#x27;inline&#x27; JSX that&#x27;s inside the paragraph should
+        // now get a linebreak after it in the generated HTML. Easier to test
+        // and looks better in the HTML.
+        prevInlineToken.content += &#x27;\n&#x27;;
+        paragraphTokensToRemove.push(
+          blkIdx,
+          i
+        );
+        break;
+      }
+    }
+
+    state.tokens = state.tokens.filter(function(blkToken, idx) {
+      return paragraphTokensToRemove.indexOf(idx) === -1;
+    });
+  });
+
+  md.renderer.rules.fence = escape_code(md.renderer.rules.fence);
+  md.renderer.rules.code_inline = escape_code(md.renderer.rules.code_inline);
+  md.renderer.rules.code_block = escape_code(md.renderer.rules.code_block);
+
+  md.renderer.rules[&#x27;jsx_inline&#x27;] = function(tokens, idx) {
+    // If the span is JSX, just pass the original source for the span
+    // through to output.
+    return tokens[idx].content;
+  };
+}</pre></li>
+    <li>example usage<pre class="apidocCodePre">n/a</pre></li>
+    </ul>
+
+
+</div>
+
+<div class="apidocFooterDiv">
+    [ this document was created with
+    <a href="https://github.com/kaizhu256/node-utility2" target="_blank">utility2</a>
+    ]
+</div>
+</div>
